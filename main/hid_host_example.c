@@ -232,28 +232,6 @@ static inline void hid_keyboard_print_char(unsigned int key_char)
 }
 
 /**
- * @brief Key Event. Key event with the key code, state and modifier.
- *
- * @param[in] key_event Pointer to Key Event structure
- *
- */
-static void key_event_callback(key_event_t *key_event)
-{
-    unsigned char key_char;
-
-    hid_print_new_device_report_header(HID_PROTOCOL_KEYBOARD);
-
-    if (KEY_STATE_PRESSED == key_event->state) {
-        if (hid_keyboard_get_char(key_event->modifier,
-                                  key_event->key_code, &key_char)) {
-
-            hid_keyboard_print_char(key_char);
-
-        }
-    }
-}
-
-/**
  * @brief Key buffer scan code search.
  *
  * @param[in] src       Pointer to source buffer where to search
@@ -272,11 +250,28 @@ static inline bool key_found(const uint8_t *const src,
     return false;
 }
 
+
+/**
+ * @brief Função para imprimir eventos de teclado
+ *
+ * @param key_code  Código da tecla ou modificador
+ * @param state     Estado da tecla (pressionada/liberada)
+ */
+static void print_key_event(uint8_t key_code, int state)
+{
+    if (state == KEY_STATE_PRESSED) {
+        printf("Key pressed: keycode = %d, state = %d\n", key_code, state);
+    } else if (state == KEY_STATE_RELEASED) {
+        printf("Key released: keycode = %d, state = %d\n", key_code, state);
+    }
+    fflush(stdout); // Garantir que a saída seja imediatamente exibida
+}
+
 /**
  * @brief USB HID Host Keyboard Interface report callback handler
  *
- * @param[in] data    Pointer to input report data buffer
- * @param[in] length  Length of input report data buffer
+ * @param[in] data    Ponteiro para o buffer de dados de relatórios de entrada
+ * @param[in] length  Comprimento do buffer de dados de relatórios de entrada
  */
 static void hid_host_keyboard_report_callback(const uint8_t *const data, const int length)
 {
@@ -289,28 +284,41 @@ static void hid_host_keyboard_report_callback(const uint8_t *const data, const i
     static uint8_t prev_keys[HID_KEYBOARD_KEY_MAX] = { 0 };
     key_event_t key_event;
 
-    for (int i = 0; i < HID_KEYBOARD_KEY_MAX; i++) {
+    // Verificar modificadores (Shift, Ctrl, Alt, etc.)
+    uint8_t modifier = kb_report->modifier.val;
+    static uint8_t prev_modifier = 0;
 
-        // key has been released verification
-        if (prev_keys[i] > HID_KEY_ERROR_UNDEFINED &&
-                !key_found(kb_report->key, prev_keys[i], HID_KEYBOARD_KEY_MAX)) {
-            key_event.key_code = prev_keys[i];
-            key_event.modifier = 0;
-            key_event.state = KEY_STATE_RELEASED;
-            key_event_callback(&key_event);
-        }
-
-        // key has been pressed verification
-        if (kb_report->key[i] > HID_KEY_ERROR_UNDEFINED &&
-                !key_found(prev_keys, kb_report->key[i], HID_KEYBOARD_KEY_MAX)) {
-            key_event.key_code = kb_report->key[i];
-            key_event.modifier = kb_report->modifier.val;
-            key_event.state = KEY_STATE_PRESSED;
-            key_event_callback(&key_event);
+    // Checar se um modificador foi liberado ou pressionado
+    if (prev_modifier != modifier) {
+        for (int i = 0; i < 8; i++) {
+            uint8_t current_mod = (modifier >> i) & 1;
+            uint8_t prev_mod = (prev_modifier >> i) & 1;
+            if (current_mod != prev_mod) {
+                // Tratar o modificador como um keycode comum (0xE0 + i)
+                print_key_event(0xE0 + i, current_mod ? KEY_STATE_PRESSED : KEY_STATE_RELEASED);
+            }
         }
     }
 
-    memcpy(prev_keys, &kb_report->key, HID_KEYBOARD_KEY_MAX);
+    prev_modifier = modifier;
+
+    // Lidar com teclas pressionadas e liberadas
+    for (int i = 0; i < HID_KEYBOARD_KEY_MAX; i++) {
+        // Verificar se a tecla foi liberada
+        if (prev_keys[i] > HID_KEY_ERROR_UNDEFINED &&
+            !key_found(kb_report->key, prev_keys[i], HID_KEYBOARD_KEY_MAX)) {
+            print_key_event(prev_keys[i], KEY_STATE_RELEASED);
+        }
+
+        // Verificar se a tecla foi pressionada
+        if (kb_report->key[i] > HID_KEY_ERROR_UNDEFINED &&
+            !key_found(prev_keys, kb_report->key[i], HID_KEYBOARD_KEY_MAX)) {
+            print_key_event(kb_report->key[i], KEY_STATE_PRESSED);
+        }
+    }
+
+    // Atualizar teclas anteriores
+    memcpy(prev_keys, kb_report->key, HID_KEYBOARD_KEY_MAX);
 }
 
 /**
