@@ -260,9 +260,9 @@ static inline bool key_found(const uint8_t *const src,
 static void print_key_event(uint8_t key_code, int state)
 {
     if (state == KEY_STATE_PRESSED) {
-        printf("Key pressed: keycode = %d, state = %d\n", key_code, state);
+        printf("keycode = %d, state = %d\n", key_code, state);
     } else if (state == KEY_STATE_RELEASED) {
-        printf("Key released: keycode = %d, state = %d\n", key_code, state);
+        printf("keycode = %d, state = %d\n", key_code, state);
     }
     fflush(stdout); // Garantir que a saída seja imediatamente exibida
 }
