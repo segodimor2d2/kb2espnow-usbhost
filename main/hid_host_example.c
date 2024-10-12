@@ -17,16 +17,20 @@
 #include "usb/usb_host.h"
 #include "errno.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"  // Inclusão do driver UART
 
 #include "usb/hid_host.h"
 #include "usb/hid_usage_keyboard.h"
 #include "usb/hid_usage_mouse.h"
 
+// Definições de UART
+#define UART_NUM UART_NUM_0
+#define BUF_SIZE (1024)
+
 /* GPIO Pin number for quit from example logic */
 #define APP_QUIT_PIN                GPIO_NUM_0
 
 static const char *TAG = "example";
-
 QueueHandle_t app_event_queue = NULL;
 
 /**
@@ -251,6 +255,14 @@ static inline bool key_found(const uint8_t *const src,
 }
 
 
+// Função para enviar dados pela UART
+static void uart_send_key_event(uint8_t key_code, int state) {
+    char buffer[50];
+    int len = snprintf(buffer, sizeof(buffer), "keycode=%d,state=%d\n", key_code, state);
+    uart_write_bytes(UART_NUM, buffer, len);
+}
+
+
 /**
  * @brief Função para imprimir eventos de teclado
  *
@@ -261,11 +273,14 @@ static void print_key_event(uint8_t key_code, int state)
 {
     if (state == KEY_STATE_PRESSED) {
         printf("keycode = %d, state = %d\n", key_code, state);
+        uart_send_key_event(key_code, state); // Envia via UART
     } else if (state == KEY_STATE_RELEASED) {
         printf("keycode = %d, state = %d\n", key_code, state);
+        uart_send_key_event(key_code, state); // Envia via UART
     }
     fflush(stdout); // Garantir que a saída seja imediatamente exibida
 }
+
 
 /**
  * @brief USB HID Host Keyboard Interface report callback handler
@@ -538,8 +553,29 @@ void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
     }
 }
 
+/**
+ * @brief Inicializa a UART
+ */
+static void uart_init() {
+    const uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .rx_flow_ctrl_thresh = 122,
+    };
+
+    // Instalar o driver da UART
+    uart_driver_install(UART_NUM, BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM, &uart_config);
+    uart_set_pin(UART_NUM, GPIO_NUM_1, GPIO_NUM_3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE); // Ajuste os pinos conforme necessário
+}
+
+
 void app_main(void)
 {
+    uart_init();
     BaseType_t task_created;
     app_event_queue_t evt_queue;
     ESP_LOGI(TAG, "HID Host example");
