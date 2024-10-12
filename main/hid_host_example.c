@@ -272,10 +272,10 @@ static void uart_send_key_event(uint8_t key_code, int state) {
 static void print_key_event(uint8_t key_code, int state)
 {
     if (state == KEY_STATE_PRESSED) {
-        printf("keycode = %d, state = %d\n", key_code, state);
+        //printf("keycode = %d, state = %d\n", key_code, state);
         uart_send_key_event(key_code, state); // Envia via UART
     } else if (state == KEY_STATE_RELEASED) {
-        printf("keycode = %d, state = %d\n", key_code, state);
+        //printf("keycode = %d, state = %d\n", key_code, state);
         uart_send_key_event(key_code, state); // Envia via UART
     }
     fflush(stdout); // Garantir que a saída seja imediatamente exibida
